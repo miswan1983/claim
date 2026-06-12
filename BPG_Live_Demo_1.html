@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BPG Fleet Dashboard — Demo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1c2230;--bg4:#21283a;
+  --bdr:rgba(255,255,255,.07);--bdr2:rgba(255,255,255,.13);
+  --tx:#e6edf3;--tx2:#8b949e;--tx3:#6e7681;
+  --bl:#388bfd;--bl-bg:rgba(56,139,253,.12);
+  --gn:#3fb950;--gn-bg:rgba(63,185,80,.12);
+  --am:#d29922;--am-bg:rgba(210,153,34,.12);
+  --rd:#f85149;--rd-bg:rgba(248,81,73,.12);
+  --pu:#a371f7;--pu-bg:rgba(163,113,247,.12);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+  font-size:13px;color:var(--tx);background:var(--bg);
+}
+
+/* LOGIN */
+#login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+.login-box{background:var(--bg2);border:1px solid var(--bdr);border-radius:14px;padding:36px;width:400px;max-width:calc(100vw - 32px)}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.login-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1f6feb,#388bfd);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.demo-users{background:var(--bg3);border-radius:8px;padding:12px 14px;margin-bottom:18px}
+.demo-lbl{font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:600}
+.demo-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bdr);cursor:pointer;border-radius:4px;padding:6px 8px;transition:background .13s}
+.demo-row:last-child{border-bottom:none}
+.demo-row:hover{background:var(--bg4)}
+.demo-role{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600}
+
+/* APP LAYOUT */
+#app{display:none;min-height:100vh;flex-direction:row}
+#app.on{display:flex}
+#sb{width:220px;background:var(--bg2);border-right:1px solid var(--bdr);display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;bottom:0;z-index:100}
+#main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;overflow:hidden}
+#topbar{height:50px;background:var(--bg2);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:50;flex-shrink:0;gap:10px}
+#content{flex:1;padding:20px;overflow-y:auto;max-height:calc(100vh - 50px)}
+
+/* SIDEBAR */
+.sb-brand{display:flex;align-items:center;gap:10px;padding:15px 16px;border-bottom:1px solid var(--bdr)}
+.sb-icon{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#1f6feb,#388bfd);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.sb-sec{padding:12px 14px 4px;font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em}
+.sb-link{display:flex;align-items:center;gap:9px;padding:7px 16px;cursor:pointer;border-radius:6px;margin:1px 6px;color:var(--tx2);font-size:12px;transition:all .12s;user-select:none}
+.sb-link:hover{background:var(--bg3);color:var(--tx)}
+.sb-link.on{background:var(--bl-bg);color:var(--bl)}
+.sb-link .lbl{flex:1}
+.sb-badge{background:var(--rd);color:#fff;font-size:9px;padding:1px 5px;border-radius:10px;font-weight:700;min-width:16px;text-align:center}
+.sb-foot{margin-top:auto;padding:10px;border-top:1px solid var(--bdr)}
+.ava{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;background:var(--ac,#1f6feb)}
+
+/* PAGES */
+.pg{display:none}.pg.on{display:block}
+
+/* CARDS + GRID */
+.card{background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:16px 18px;margin-bottom:0}
+.ch{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap}
+.ct{font-size:13px;font-weight:600}
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+
+/* KPI */
+.kpi{background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.kpi:hover{border-color:var(--bdr2)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:10px 10px 0 0}
+.kpi.bl::before{background:var(--bl)}.kpi.gn::before{background:var(--gn)}.kpi.am::before{background:var(--am)}.kpi.rd::before{background:var(--rd)}
+.kv{font-size:24px;font-weight:700;letter-spacing:-.5px;margin:8px 0 2px}
+.kl{font-size:11px;color:var(--tx2)}
+.kd{font-size:10px;color:var(--tx3);margin-top:4px}
+
+/* TABLE */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:7px 10px;color:var(--tx3);font-size:10px;font-weight:500;border-bottom:1px solid var(--bdr);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{color:var(--tx)}
+td{padding:9px 10px;border-bottom:1px solid var(--bdr);color:var(--tx);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.dr:hover td{background:var(--bg3);cursor:pointer}
+
+/* PILL */
+.pill{display:inline-flex;align-items:center;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;white-space:nowrap}
+.p-gn{background:var(--gn-bg);color:var(--gn)}.p-bl{background:var(--bl-bg);color:var(--bl)}
+.p-am{background:var(--am-bg);color:var(--am)}.p-rd{background:var(--rd-bg);color:var(--rd)}
+.p-pu{background:var(--pu-bg);color:var(--pu)}.p-gr{background:var(--bg3);color:var(--tx2)}
+
+/* BUTTONS */
+.btn{padding:6px 14px;border-radius:6px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--tx);cursor:pointer;font-size:12px;font-weight:500;transition:all .13s;white-space:nowrap}
+.btn:hover{border-color:var(--bl);color:var(--bl);background:var(--bl-bg)}
+.btn.pr{background:#1f6feb;border-color:#1f6feb;color:#fff}.btn.pr:hover{background:#388bfd}
+.btn.gn{background:var(--gn-bg);border-color:rgba(63,185,80,.3);color:var(--gn)}
+.btn.rd{background:var(--rd-bg);border-color:rgba(248,81,73,.3);color:var(--rd)}
+.btn.sm{padding:4px 10px;font-size:11px}
+.btn-lock{opacity:.4;cursor:not-allowed!important}
+
+/* INPUTS */
+input,select,textarea{font-family:inherit;font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--tx);outline:none;transition:border-color .13s}
+input:focus,select:focus,textarea:focus{border-color:var(--bl)}
+
+/* SIDE PANEL */
+#panel{position:fixed;right:0;top:0;bottom:0;width:390px;background:var(--bg2);border-left:1px solid var(--bdr2);z-index:300;transform:translateX(100%);transition:transform .25s;display:flex;flex-direction:column}
+#panel.on{transform:translateX(0)}
+.pan-head{display:flex;justify-content:space-between;align-items:center;padding:15px 18px;border-bottom:1px solid var(--bdr);flex-shrink:0}
+.pan-body{flex:1;overflow-y:auto;padding:16px 18px}
+.pan-foot{padding:12px 18px;border-top:1px solid var(--bdr);display:flex;gap:8px;flex-shrink:0}
+.fg{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.fl{font-size:11px;font-weight:600;color:var(--tx2)}
+
+/* MODAL */
+#mo-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000;display:none;align-items:center;justify-content:center}
+#mo-overlay.on{display:flex}
+#mo-box{background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;width:620px;max-width:calc(100vw - 32px);max-height:88vh;overflow-y:auto}
+.mo-head{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 14px;border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--bg2);z-index:2}
+.mo-close{background:none;border:1px solid var(--bdr2);border-radius:6px;color:var(--tx2);font-size:16px;cursor:pointer;padding:1px 8px;line-height:1.4}
+.mo-body{padding:18px 20px}
+.mo-foot{padding:14px 20px 18px;border-top:1px solid var(--bdr);display:flex;gap:8px;justify-content:flex-end}
+.frow{display:grid;gap:10px;margin-bottom:10px}
+.frow-2{grid-template-columns:1fr 1fr}.frow-3{grid-template-columns:1fr 1fr 1fr}
+
+/* TOAST */
+#toast{position:fixed;bottom:22px;right:22px;background:var(--bg4);border:1px solid var(--bdr2);border-radius:8px;padding:10px 16px;font-size:12px;z-index:9999;transform:translateY(80px);opacity:0;transition:all .25s;max-width:280px;pointer-events:none;line-height:1.4}
+#toast.on{transform:translateY(0);opacity:1}
+#toast.ok{border-color:rgba(63,185,80,.4);color:var(--gn)}
+#toast.err{border-color:rgba(248,81,73,.4);color:var(--rd)}
+#toast.info{border-color:rgba(56,139,253,.4);color:var(--bl)}
+
+/* MISC */
+.divider{height:1px;background:var(--bdr);margin:12px 0}
+.alert{display:flex;align-items:flex-start;gap:8px;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:12px;line-height:1.5}
+.a-am{background:var(--am-bg);border:1px solid rgba(210,153,34,.3);color:var(--am)}
+.a-bl{background:var(--bl-bg);border:1px solid rgba(56,139,253,.3);color:var(--bl)}
+.a-rd{background:var(--rd-bg);border:1px solid rgba(248,81,73,.3);color:var(--rd)}
+.live{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--gn)}
+.live::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--gn);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.search-w{position:relative}.search-w input{padding-left:26px}
+.search-w::before{content:'🔍';position:absolute;left:7px;top:50%;transform:translateY(-50%);font-size:10px;pointer-events:none}
+.pr-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.pr-lbl{font-size:11px;color:var(--tx2);width:150px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr-bar{flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.pr-fill{height:100%;border-radius:3px}
+.pr-val{font-size:11px;color:var(--tx2);width:55px;text-align:right}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:3px}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--bdr);margin-bottom:14px}
+.tab{padding:7px 14px;font-size:12px;font-weight:500;color:var(--tx2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .12s}
+.tab:hover{color:var(--tx)}.tab.on{color:var(--bl);border-bottom-color:var(--bl)}
+.tb{display:none}.tb.on{display:block}
+/* Timeline */
+.tl-ph{padding:10px 12px;border-radius:8px 8px 0 0;cursor:pointer;transition:filter .15s;user-select:none}
+.tl-ph:hover{filter:brightness(1.12)}
+.tl-seg{position:absolute;height:19px;top:2px;border-radius:4px;display:flex;align-items:center;padding:0 7px;font-size:10px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-dl{position:absolute;top:-2px;bottom:0;width:2px;border-radius:1px;opacity:.55}
+.tl-dl::after{content:attr(data-l);position:absolute;top:-13px;left:3px;font-size:8px;font-weight:700;white-space:nowrap}
+.tl-pos{position:absolute;top:-2px;bottom:0;width:2.5px;border-radius:1px;opacity:.9}
+.tl-pos::after{content:attr(data-l);position:absolute;top:-13px;left:4px;font-size:8px;font-weight:700;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══════════════════════════════════════ -->
+<div id="login-wrap">
+<div class="login-box">
+  <div class="login-logo">
+    <div class="login-icon">⚓</div>
+    <div>
+      <div style="font-size:20px;font-weight:800;letter-spacing:-.3px">BPG Fleet Ops</div>
+      <div style="font-size:12px;color:var(--tx3)">Barokah Perkasa Group · Dashboard</div>
+    </div>
+  </div>
+  <div style="font-size:12px;color:var(--tx2);margin-bottom:14px">Masuk dengan akun kamu, atau pilih demo user di bawah:</div>
+
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+    <div class="fg" style="margin-bottom:8px"><div class="fl">Email</div><input type="email" id="l-email" placeholder="nama@domain.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="fg" style="margin-bottom:4px"><div class="fl">Password</div><input type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div id="l-err" style="font-size:12px;color:var(--rd);display:none"></div>
+    <button class="btn pr" onclick="doLogin()" style="width:100%;padding:9px;margin-top:2px">Masuk</button>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="demo-users">
+    <div class="demo-lbl">👤 Demo Accounts — klik untuk langsung masuk</div>
+    <div class="demo-row" onclick="quickLogin('superadmin@bpg.demo','demo123')">
+      <div>
+        <div style="font-size:12px;font-weight:500">Miswan · Superadmin</div>
+        <div style="font-size:10px;color:var(--tx3)">superadmin@bpg.demo</div>
+      </div>
+      <span class="demo-role" style="background:var(--rd-bg);color:var(--rd)">SUPERADMIN</span>
+    </div>
+    <div class="demo-row" onclick="quickLogin('admin@bpg.demo','demo123')">
+      <div>
+        <div style="font-size:12px;font-weight:500">Budi · Admin Operasional</div>
+        <div style="font-size:10px;color:var(--tx3)">admin@bpg.demo</div>
+      </div>
+      <span class="demo-role" style="background:var(--am-bg);color:var(--am)">ADMIN</span>
+    </div>
+    <div class="demo-row" onclick="quickLogin('viewer@bpg.demo','demo123')">
+      <div>
+        <div style="font-size:12px;font-weight:500">Sari · Viewer</div>
+        <div style="font-size:10px;color:var(--tx3)">viewer@bpg.demo</div>
+      </div>
+      <span class="demo-role" style="background:var(--bl-bg);color:var(--bl)">VIEWER</span>
+    </div>
+  </div>
+  <div style="font-size:10px;color:var(--tx3);text-align:center;margin-top:12px">Mode demo — data disimpan di browser sesi ini</div>
+</div>
+</div>
+
+<!-- ═══ APP ════════════════════════════════════════ -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <nav id="sb">
+    <div class="sb-brand">
+      <div class="sb-icon">⚓</div>
+      <div><div style="font-size:12px;font-weight:700">BPG Fleet Ops</div><div style="font-size:10px;color:var(--tx3)">Pertamina Charter</div></div>
+    </div>
+    <div class="sb-sec">Ringkasan</div>
+    <div class="sb-link on" onclick="nav('dashboard',this)"><span>📊</span><span class="lbl">Dashboard</span></div>
+    <div class="sb-link" onclick="nav('armada',this)"><span>🚢</span><span class="lbl">Armada (51)</span></div>
+    <div class="sb-sec">Klaim</div>
+    <div class="sb-link" onclick="nav('klaim',this)"><span>📋</span><span class="lbl">Semua Klaim</span><span class="sb-badge" id="bdg">11</span></div>
+    <div class="sb-link" onclick="nav('slowspeed',this)"><span>🐢</span><span class="lbl">Slow Speed</span></div>
+    <div class="sb-link" onclick="nav('progress',this)"><span>📅</span><span class="lbl">Progress Sanggah</span></div>
+    <div class="sb-link" onclick="nav('timeline',this)"><span>🗂</span><span class="lbl">Timeline Klaim</span></div>
+    <div class="sb-sec">Data</div>
+    <div class="sb-link" onclick="nav('upload',this)"><span>📂</span><span class="lbl">Upload / Export</span></div>
+    <div id="sb-admin" style="display:none"><div class="sb-sec">Admin</div>
+      <div class="sb-link" onclick="nav('users',this)"><span>👥</span><span class="lbl">Kelola User</span></div>
+    </div>
+    <div class="sb-foot">
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 8px">
+        <div class="ava" id="sb-ava">?</div>
+        <div style="min-width:0;flex:1">
+          <div style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="sb-nama">-</div>
+          <span id="sb-rbadge" class="pill p-bl" style="font-size:9px;margin-top:2px">-</span>
+        </div>
+        <button class="btn sm" onclick="doLogout()" title="Logout" style="flex-shrink:0">↩</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <div id="main">
+    <div id="topbar">
+      <div>
+        <div style="font-size:14px;font-weight:600" id="top-title">Dashboard</div>
+        <div style="font-size:11px;color:var(--tx3)" id="top-sub">BPG · Pertamina Patra Niaga</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="live">Demo</span>
+        <div class="search-w" style="width:170px"><input style="width:100%" placeholder="Cari klaim..." id="g-q" oninput="gSearch(this.value)"></div>
+        <button class="btn gn sm" id="btn-export" onclick="exportExcel()">⬇ Excel</button>
+        <button class="btn sm" onclick="window.print()">🖨</button>
+      </div>
+    </div>
+
+    <div id="content">
+
+      <!-- DASHBOARD -->
+      <div id="pg-dashboard" class="pg on">
+        <div id="dash-alert" class="alert a-am" style="display:none"></div>
+        <div class="g4" style="margin-bottom:16px">
+          <div class="kpi bl" onclick="nav('klaim',qs('[onclick*=klaim]'))"><div style="font-size:14px">📋</div><div class="kv" id="kv-total">—</div><div class="kl">Total Klaim</div><div class="kd" id="kd-total">—</div></div>
+          <div class="kpi rd" onclick="nav('slowspeed',qs('[onclick*=slow]'))"><div style="font-size:14px">🐢</div><div class="kv" id="kv-ss">—</div><div class="kl">Voyage Slow Speed</div><div class="kd" id="kd-ss">—</div></div>
+          <div class="kpi am"><div style="font-size:14px">💰</div><div class="kv" id="kv-usd">—</div><div class="kl">Total Nilai USD</div><div class="kd" id="kd-usd">—</div></div>
+          <div class="kpi gn"><div style="font-size:14px">✅</div><div class="kv" id="kv-done">—</div><div class="kl">Claimable</div><div class="kd" id="kd-done">—</div></div>
+        </div>
+        <div class="g2" style="margin-bottom:14px">
+          <div class="card"><div class="ch"><div class="ct">📊 Status Klaim</div></div><div style="height:200px;position:relative"><canvas id="cS"></canvas></div></div>
+          <div class="card"><div class="ch"><div class="ct">📈 Jenis Klaim</div></div><div style="height:200px;position:relative"><canvas id="cJ"></canvas></div></div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ct">🚨 Klaim Terbaru</div><button class="btn sm" onclick="nav('klaim',qs('[onclick*=klaim]'))">Lihat semua →</button></div>
+          <div class="tw"><table><thead><tr><th>Kapal</th><th>Jenis</th><th>Status</th><th>Total IDR</th><th>Due Date</th></tr></thead><tbody id="dash-body"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- ARMADA -->
+      <div id="pg-armada" class="pg">
+        <div class="card">
+          <div class="ch"><div class="ct">🚢 Armada BPG (51 kapal)</div>
+            <div style="display:flex;gap:8px">
+              <select id="arm-f" onchange="renderArmada()" style="width:auto"><option value="">Semua Fleet</option><option>FLEET I</option><option>FLEET II</option><option>FLEET III</option><option>FLEET IV</option><option>FLEET V</option></select>
+              <div class="search-w" style="width:140px"><input id="arm-q" placeholder="Cari..." oninput="renderArmada()" style="width:100%"></div>
+            </div>
+          </div>
+          <div class="tw"><table><thead><tr><th>No</th><th>Nama Kapal</th><th>Fleet</th><th>Kontrak</th><th>Jenis</th><th>Klaim</th></tr></thead><tbody id="arm-body"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- KLAIM -->
+      <div id="pg-klaim" class="pg">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="kl-s" onchange="renderKlaim()" style="width:auto"><option value="">Semua Status</option><option>CLAIMABLE</option><option>ON PROSES</option><option>UNCLAIM</option><option>OWNER BENEFIT</option></select>
+            <select id="kl-j" onchange="renderKlaim()" style="width:auto"><option value="">Semua Jenis</option><option>SLOW SPEED</option><option>OVER BUNKER SLOW SPEED</option><option>OFF HIRE</option><option>BUNKER OFF HIRE</option><option>TRANSPORT LOSS</option><option>SLOW PUMPING</option></select>
+            <div class="search-w" style="width:150px"><input id="kl-q" placeholder="Cari kapal..." oninput="renderKlaim()" style="width:100%"></div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn sm gn" id="btn-add-k" onclick="openAddKlaim()">+ Tambah</button>
+            <button class="btn sm" onclick="exportExcel('klaim')">⬇ Excel</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0">
+          <div class="tw"><table><thead><tr><th>Kapal</th><th>Jenis</th><th>Status</th><th>No Surat</th><th>USD</th><th>Total IDR</th><th>Due Date</th><th>Aksi</th></tr></thead><tbody id="kl-body"></tbody></table></div>
+          <div id="kl-foot" style="padding:10px 14px;font-size:11px;color:var(--tx3);border-top:1px solid var(--bdr)"></div>
+        </div>
+      </div>
+
+      <!-- SLOW SPEED -->
+      <div id="pg-slowspeed" class="pg">
+        <div class="g4" style="margin-bottom:14px">
+          <div class="kpi rd"><div class="kv" id="ss-total">—</div><div class="kl">Total Voyage SS</div></div>
+          <div class="kpi" style="border-color:var(--bdr)"><div class="kv" id="ss-unclaim">—</div><div class="kl">Unclaim</div></div>
+          <div class="kpi am"><div class="kv" id="ss-proses">—</div><div class="kl">On Proses</div></div>
+          <div class="kpi gn"><div class="kv" id="ss-claim">—</div><div class="kl">Claimable</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;gap:8px">
+            <select id="ss-f" onchange="renderSS()" style="width:auto"><option value="">Semua Status</option><option>CLAIMABLE</option><option>ON PROSES</option><option>UNCLAIM</option><option>KOREKSI</option></select>
+            <div class="search-w" style="width:140px"><input id="ss-q" placeholder="Cari..." oninput="renderSS()" style="width:100%"></div>
+          </div>
+          <button class="btn sm gn" id="btn-add-ss" onclick="openAddSS()">+ Tambah Voyage</button>
+        </div>
+        <div class="card" style="padding:0">
+          <div class="tw"><table><thead><tr><th>#</th><th>Kapal</th><th>Voyage</th><th>Status</th><th>Dari</th><th>Tiba</th><th>Jenis</th><th>Nilai</th><th>Aksi</th></tr></thead><tbody id="ss-body"></tbody></table></div>
+          <div id="ss-foot" style="padding:10px 14px;font-size:11px;color:var(--tx3);border-top:1px solid var(--bdr)"></div>
+        </div>
+      </div>
+
+      <!-- PROGRESS -->
+      <div id="pg-progress" class="pg">
+        <div class="alert a-bl">ℹ Update mingguan progress sanggahan klaim ke Pertamina</div>
+        <div class="card">
+          <div class="ch"><div class="ct">📅 Progress Sanggahan</div></div>
+          <div class="tw"><table><thead><tr><th>#</th><th>Kapal</th><th>Deskripsi Klaim</th><th>Progress Terkini</th><th>USD</th><th>IDR</th><th>Aksi</th></tr></thead><tbody id="prog-body"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- TIMELINE -->
+      <div id="pg-timeline" class="pg">
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:11px;color:var(--tx3)">Simulasi posisi klaim:</span>
+          <span class="pill p-gn" id="ex-s" style="cursor:pointer;padding:4px 12px" onclick="tlEx('selesai',this)">✅ Selesai H45</span>
+          <span class="pill p-am" id="ex-p" style="cursor:pointer;padding:4px 12px" onclick="tlEx('proses',this)">⏳ On Proses H18</span>
+          <span class="pill p-rd" id="ex-o" style="cursor:pointer;padding:4px 12px" onclick="tlEx('overdue',this)">🚨 Overdue H52</span>
+          <span class="pill p-bl" id="ex-a" style="cursor:pointer;padding:4px 12px" onclick="tlEx('awal',this)">🆕 Baru H2</span>
+        </div>
+        <div id="tl-ph" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:0"></div>
+        <div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:0 0 10px 10px;padding:10px 14px 14px;margin-bottom:10px">
+          <div id="tl-ruler" style="position:relative;height:20px;margin-left:76px;margin-bottom:5px"></div>
+          <div id="tl-lanes"></div>
+        </div>
+        <div id="tl-ms" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px"></div>
+        <div id="tl-det" style="display:none"></div>
+      </div>
+
+      <!-- UPLOAD -->
+      <div id="pg-upload" class="pg">
+        <div class="g2" style="gap:14px">
+          <div class="card">
+            <div class="ch"><div class="ct">📂 Import dari Excel</div></div>
+            <div style="border:2px dashed var(--bdr2);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .15s" id="drop-z" onclick="document.getElementById('fin').click()" ondragover="event.preventDefault();this.style.borderColor='var(--bl)'" ondragleave="this.style.borderColor=''" ondrop="handleDrop(event)">
+              <div style="font-size:28px;margin-bottom:8px">📊</div>
+              <div style="font-weight:500;margin-bottom:4px">Klik atau seret file Excel ke sini</div>
+              <div style="font-size:11px;color:var(--tx2)">.xlsx · .xls · .csv</div>
+            </div>
+            <input type="file" id="fin" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this.files[0])">
+            <div id="up-st" style="margin-top:10px;font-size:12px;color:var(--tx2)"></div>
+          </div>
+          <div class="card">
+            <div class="ch"><div class="ct">⬇ Export Data</div></div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button class="btn gn" onclick="exportExcel('klaim')">📊 Klaim → Excel</button>
+              <button class="btn gn" onclick="exportExcel('ss')">📊 Slow Speed → Excel</button>
+              <button class="btn" onclick="exportCSV('klaim')">📄 Klaim → CSV</button>
+              <button class="btn" onclick="exportCSV('ss')">📄 Slow Speed → CSV</button>
+              <button class="btn" onclick="exportExcel('all')">📦 Semua Data → Excel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- USER MANAGEMENT -->
+      <div id="pg-users" class="pg">
+        <div class="alert a-am">⚠ Hanya superadmin yang bisa mengakses halaman ini</div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="ch"><div class="ct">👥 Daftar User</div><button class="btn sm gn" onclick="openAddUser()">+ Tambah User</button></div>
+          <div class="tw"><table><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr></thead><tbody id="u-body"></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ct">📋 Panduan Role</div></div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--tx2)">
+            <div><span class="pill p-rd" style="margin-right:8px">superadmin</span>Akses penuh: edit data, kelola user, ubah role</div>
+            <div><span class="pill p-am" style="margin-right:8px">admin</span>Edit & tambah data klaim, upload Excel, tidak bisa kelola user</div>
+            <div><span class="pill p-bl" style="margin-right:8px">viewer</span>Hanya lihat & download, tidak bisa edit apapun</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- SIDE PANEL -->
+<div id="panel">
+  <div class="pan-head">
+    <div style="font-size:13px;font-weight:700" id="pan-t">Detail</div>
+    <div style="display:flex;gap:6px">
+      <button class="btn sm gn" id="pan-sv" onclick="savePanel()">💾 Simpan</button>
+      <button class="btn sm" onclick="closePanel()">✕</button>
+    </div>
+  </div>
+  <div class="pan-body" id="pan-b"></div>
+  <div class="pan-foot" id="pan-f"></div>
+</div>
+
+<!-- MODAL -->
+<div id="mo-overlay" onclick="if(event.target===this)closeMo()">
+  <div id="mo-box">
+    <div class="mo-head"><div style="font-size:15px;font-weight:700" id="mo-t">—</div><button class="mo-close" onclick="closeMo()">×</button></div>
+    <div class="mo-body" id="mo-b"></div>
+    <div class="mo-foot" id="mo-f"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+// DEMO USERS
+// ══════════════════════════════════════════════════
+const DEMO_USERS = {
+  'superadmin@bpg.demo': { pass:'demo123', nama:'Miswan', role:'superadmin' },
+  'admin@bpg.demo':      { pass:'demo123', nama:'Budi Santoso', role:'admin' },
+  'viewer@bpg.demo':     { pass:'demo123', nama:'Sari Dewi', role:'viewer' },
+};
+let CUR = null; // current user
+
+// ── DEMO DATA ─────────────────────────────────────
+let KLAIM = [
+  {id:1,kapal:'OB RATU INTAN / TB NURI NUSANTARA',jenis:'OFF HIRE',status:'CLAIMABLE',nomor_surat:'107/PIS2330/2024-S6',tahun:2023,usd:98378.23,idr:null,total_idr:1475673450,email_masuk:'2024-01-16',due_date:'2024-01-26',progress:'DN 9000011280 tgl 07-02-2024',catatan:'Selesai diproses'},
+  {id:2,kapal:'OB RATU INTAN / TB NURI NUSANTARA',jenis:'BUNKER OFF HIRE',status:'CLAIMABLE',nomor_surat:'107/PIS2330/2024-S6',tahun:2023,usd:null,idr:151426166.91,total_idr:151426166.91,email_masuk:'2024-01-16',due_date:'2024-01-26',progress:'Konfirmasi 26-01-2024',catatan:''},
+  {id:3,kapal:'MT RATU RAISYA',jenis:'SLOW SPEED',status:'CLAIMABLE',nomor_surat:'084/PIS2330/2024-S6',tahun:2023,usd:9817.51,idr:null,total_idr:147262650,email_masuk:'2024-01-17',due_date:'2024-01-27',progress:'Surat sanggahan dikirim 28-03-2024',catatan:'BMKG tidak memenuhi'},
+  {id:4,kapal:'MT RATU RAISYA',jenis:'OVER BUNKER SLOW SPEED',status:'CLAIMABLE',nomor_surat:'084/PIS2330/2024-S6',tahun:2023,usd:null,idr:120131.57,total_idr:120131.57,email_masuk:'2024-01-17',due_date:'2024-01-27',progress:'DN 9000014258 tgl 30-09-2024',catatan:''},
+  {id:5,kapal:'SPOB SEA ROYAL 27',jenis:'OVER BUNKER SLOW SPEED',status:'UNCLAIM',nomor_surat:'087/PIS2330/2024-S6',tahun:2023,usd:null,idr:53482686.4,total_idr:53482686.4,email_masuk:'2024-01-17',due_date:'—',progress:'Bukan kepemilikan BPG',catatan:'UNCLAIM'},
+  {id:6,kapal:'SPOB SULTAN SAMUDERA',jenis:'TRANSPORT LOSS',status:'CLAIMABLE',nomor_surat:'108/PIS2330/2024-S6',tahun:2023,usd:1469.18,idr:null,total_idr:22037700,email_masuk:'2024-01-16',due_date:'2024-01-26',progress:'',catatan:''},
+  {id:7,kapal:'MT RATU RUWAIDAH',jenis:'OFF HIRE',status:'CLAIMABLE',nomor_surat:'150/PIS2330/2024-S6',tahun:2023,usd:45200.0,idr:null,total_idr:678000000,email_masuk:'2024-02-10',due_date:'2024-02-20',progress:'BMKG on proses',catatan:''},
+  {id:8,kapal:'MT RATU RUWAIDAH',jenis:'BUNKER OFF HIRE',status:'CLAIMABLE',nomor_surat:'150/PIS2330/2024-S6',tahun:2023,usd:null,idr:82500000,total_idr:82500000,email_masuk:'2024-02-10',due_date:'2024-02-20',progress:'',catatan:''},
+  {id:9,kapal:'MT M PATRICIA',jenis:'SLOW SPEED',status:'ON PROSES',nomor_surat:'200/PIS2330/2024-S6',tahun:2022,usd:9004.28,idr:173195009.84,total_idr:308257909,email_masuk:'2024-03-05',due_date:'2024-03-15',progress:'BMKG Tg Priok On Proses (3 Voyage)',catatan:'Perpanjangan waktu diminta'},
+  {id:10,kapal:'MT M PATRICIA',jenis:'OVER BUNKER SLOW SPEED',status:'ON PROSES',nomor_surat:'200/PIS2330/2024-S6',tahun:2022,usd:null,idr:45230000,total_idr:45230000,email_masuk:'2024-03-05',due_date:'2024-03-15',progress:'Menunggu BMKG',catatan:''},
+  {id:11,kapal:'SPOB KAISAR',jenis:'SLOW SPEED',status:'ON PROSES',nomor_surat:'205/PIS2330/2024-S6',tahun:2022,usd:22195.22,idr:416468867.13,total_idr:749396197,email_masuk:'2024-03-10',due_date:'2024-03-20',progress:'BMKG Tg Priok On Proses (6 Voyage)',catatan:''},
+  {id:12,kapal:'MT SULTAN ZULKARNAEN',jenis:'TRANSPORT LOSS',status:'CLAIMABLE',nomor_surat:'220/PIS2330/2024-S6',tahun:2023,usd:850.0,idr:null,total_idr:12750000,email_masuk:'2024-04-01',due_date:'2024-04-11',progress:'',catatan:''},
+  {id:13,kapal:'MT SULTAN ZULKARNAEN',jenis:'SLOW PUMPING',status:'CLAIMABLE',nomor_surat:'225/PIS2330/2024-S6',tahun:2023,usd:5400.0,idr:null,total_idr:81000000,email_masuk:'2024-04-10',due_date:'2024-04-20',progress:'',catatan:''},
+  {id:14,kapal:'MT QUEEN QADARIAH',jenis:'SLOW SPEED',status:'ON PROSES',nomor_surat:'326/PIS2330/2024-S6',tahun:2023,usd:4138.2,idr:61241446.21,total_idr:123013446,email_masuk:'2024-08-04',due_date:'2024-08-14',progress:'KOREKSI jarak voyage',catatan:''},
+  {id:15,kapal:'SPOB ANINDHITA 81',jenis:'OFF HIRE',status:'CLAIMABLE',nomor_surat:'400/PIS2330/2024-S6',tahun:2023,usd:15600.0,idr:null,total_idr:234000000,email_masuk:'2024-05-15',due_date:'2024-05-25',progress:'',catatan:''},
+  {id:16,kapal:'OB RATU INTAN / TB NURI NUSANTARA',jenis:'BUNKER OFFSET DELIVERY/REDELIVERY',status:'OWNER BENEFIT',nomor_surat:'112/PIS2330/2024-S6',tahun:2023,usd:null,idr:844977601.93,total_idr:null,email_masuk:'2024-01-17',due_date:'—',progress:'Owner benefit',catatan:''},
+  {id:17,kapal:'MT RATU RUWAIDAH',jenis:'SLOW PUMPING',status:'CLAIMABLE',nomor_surat:'450/PIS2330/2024-S6',tahun:2023,usd:3200.0,idr:null,total_idr:48000000,email_masuk:'2024-06-01',due_date:'2024-06-11',progress:'',catatan:''},
+  {id:18,kapal:'SPOB BORNEO PERKASA',jenis:'TRANSPORT LOSS',status:'UNCLAIM',nomor_surat:'501/PIS2330/2024-S6',tahun:2023,usd:500,idr:null,total_idr:7500000,email_masuk:'2024-07-01',due_date:'2024-07-11',progress:'Telah disanggah',catatan:''},
+  {id:19,kapal:'MT RATU RENGGANIS',jenis:'SLOW SPEED',status:'ON PROSES',nomor_surat:'510/PIS2330/2024-S6',tahun:2023,usd:3200,idr:null,total_idr:48000000,email_masuk:'2024-07-15',due_date:'2024-07-25',progress:'BMKG on proses',catatan:''},
+  {id:20,kapal:'SPOB KERTANEGARA',jenis:'TRANSPORT LOSS',status:'CLAIMABLE',nomor_surat:'520/PIS2330/2024-S6',tahun:2023,usd:503.45,idr:null,total_idr:7551750,email_masuk:'2024-01-16',due_date:'2024-01-26',progress:'',catatan:''},
+];
+
+let SS = [
+  {id:1,kapal:'MT RATU RAISYA',voyage:'001/D3/RARA/I/2023',status:'CLAIMABLE',dari:'MONOKWARI',tiba:'SORONG',jenis:'OVER BUNKER',usd:null,idr:120131.57,total:120131.57,catatan:'BMKG tidak memenuhi'},
+  {id:2,kapal:'MT RATU RAISYA',voyage:'003/D3/RARA/II/2023',status:'CLAIMABLE',dari:'MONOKWARI',tiba:'SORONG',jenis:'SLOW SPEED',usd:443.13,idr:6646950,total:6646950,catatan:''},
+  {id:3,kapal:'MT RATU RAISYA',voyage:'007/D1/RARA/III/2023',status:'CLAIMABLE',dari:'WAYAME',tiba:'TUAL',jenis:'SLOW SPEED',usd:3801.88,idr:57028200,total:57028200,catatan:''},
+  {id:4,kapal:'MT RATU RAISYA',voyage:'010/D1/RARA/IV/2023',status:'CLAIMABLE',dari:'WAYAME',tiba:'SORONG',jenis:'SLOW SPEED',usd:5572.5,idr:83587500,total:83587500,catatan:''},
+  {id:5,kapal:'SPOB SEA ROYAL 27',voyage:'010/D/SR27/IV/2023',status:'UNCLAIM',dari:'OTM MERAK',tiba:'PULAU BAAI',jenis:'OVER BUNKER',usd:null,idr:53482686.4,total:53482686.4,catatan:'Bukan milik BPG'},
+  {id:6,kapal:'MT QUEEN QADARIAH',voyage:'016/D1/QQ/IX/2023',status:'KOREKSI',dari:'TUBAN',tiba:'TG PRIOK',jenis:'SSOB',usd:4138.2,idr:61241446.21,total:123013446,catatan:'Koreksi jarak'},
+  {id:7,kapal:'MT M PATRICIA',voyage:'005/D1/MP/II/2022',status:'ON PROSES',dari:'TUBAN',tiba:'TG PRIOK',jenis:'SLOW SPEED',usd:9004.28,idr:173195009.84,total:308257909,catatan:'BMKG on proses'},
+  {id:8,kapal:'SPOB KAISAR',voyage:'012/D/KS/III/2022',status:'ON PROSES',dari:'BALIKPAPAN',tiba:'MAKASSAR',jenis:'SLOW SPEED',usd:22195.22,idr:416468867.13,total:749396197,catatan:'BMKG Tg Priok on proses'},
+  {id:9,kapal:'MT SULTAN ZULKARNAEN',voyage:'008/D/SZ/IV/2023',status:'UNCLAIM',dari:'CILACAP',tiba:'MERAK',jenis:'SLOW SPEED',usd:null,idr:12500000,total:12500000,catatan:''},
+  {id:10,kapal:'MT RATU RUWAIDAH',voyage:'022/D/RR/VI/2023',status:'UNCLAIM',dari:'DUMAI',tiba:'PLAJU',jenis:'SSOB',usd:null,idr:45000000,total:45000000,catatan:''},
+  {id:11,kapal:'SPOB ANINDHITA 81',voyage:'031/D/AN81/VIII/2023',status:'ON PROSES',dari:'MERAK',tiba:'CIREBON',jenis:'SSOB',usd:null,idr:65000000,total:65000000,catatan:''},
+  {id:12,kapal:'MT RATU RENGGANIS',voyage:'014/D/RE/V/2023',status:'UNCLAIM',dari:'CILACAP',tiba:'TG PRIOK',jenis:'SLOW SPEED',usd:null,idr:35000000,total:35000000,catatan:''},
+];
+
+let USERS_DATA = [
+  {id:'u1',nama:'Miswan',email:'superadmin@bpg.demo',role:'superadmin'},
+  {id:'u2',nama:'Budi Santoso',email:'admin@bpg.demo',role:'admin'},
+  {id:'u3',nama:'Sari Dewi',email:'viewer@bpg.demo',role:'viewer'},
+];
+
+const ARMADA = [
+  {no:1,nama:'MT RATU RUWAIDAH',fleet:'FLEET I',kontrak:'PIS',jenis:'MT Tanker'},
+  {no:2,nama:'MT QUEEN QADARIAH',fleet:'FLEET I',kontrak:'PIS',jenis:'MT Tanker'},
+  {no:3,nama:'SPOB BORNEO PERKASA',fleet:'FLEET I',kontrak:'PIS',jenis:'SPOB'},
+  {no:4,nama:'MT M PATRICIA',fleet:'FLEET I',kontrak:'PIS',jenis:'MT Tanker'},
+  {no:5,nama:'SPOB KERTABUANA',fleet:'FLEET I',kontrak:'PIS',jenis:'SPOB'},
+  {no:6,nama:'SPOB KERTANEGARA',fleet:'FLEET I',kontrak:'PIS',jenis:'SPOB'},
+  {no:7,nama:'SPOB KAISAR',fleet:'FLEET I',kontrak:'PIS',jenis:'SPOB'},
+  {no:8,nama:'MT RATU ZAINAB',fleet:'FLEET I',kontrak:'PIS',jenis:'MT Tanker'},
+  {no:9,nama:'MT RATU RAISYA',fleet:'FLEET I',kontrak:'PIS',jenis:'MT Tanker'},
+  {no:10,nama:'MT RATU RENGGANIS',fleet:'FLEET I',kontrak:'PIS',jenis:'MT Tanker'},
+  {no:11,nama:'MT SULTAN ZULKARNAEN',fleet:'FLEET II',kontrak:'PIS',jenis:'MT Tanker'},
+  {no:12,nama:'SPOB SEA ROYAL 18',fleet:'FLEET II',kontrak:'PIS',jenis:'SPOB'},
+  {no:13,nama:'SPOB SEA ROYAL 27',fleet:'FLEET II',kontrak:'PIS',jenis:'SPOB'},
+  {no:14,nama:'OB PATIH GAJAH MADA / TB SEA MASTER',fleet:'FLEET II',kontrak:'PIS',jenis:'Oil Barge'},
+  {no:15,nama:'OB RATU INTAN / TB NURI NUSANTARA',fleet:'FLEET II',kontrak:'PIS',jenis:'Oil Barge'},
+  {no:16,nama:'SPOB ANINDHITA 81',fleet:'FLEET IV',kontrak:'PIS',jenis:'SPOB'},
+  {no:17,nama:'SPOB SULTAN SAMUDERA',fleet:'FLEET IV',kontrak:'PIS',jenis:'SPOB'},
+  {no:18,nama:'MT SULTAN ZULKARNAEN',fleet:'FLEET IV',kontrak:'PIS',jenis:'MT Tanker'},
+  {no:19,nama:'MT RATU SHARIFAH',fleet:'FLEET I',kontrak:'PHM',jenis:'MT Tanker'},
+  {no:20,nama:'SPOB BINTANG PERKASA',fleet:'FLEET I',kontrak:'PHM',jenis:'SPOB'},
+];
+
+// ══════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════
+function doLogin() {
+  const email = document.getElementById('l-email').value.trim().toLowerCase();
+  const pass  = document.getElementById('l-pass').value;
+  const u = DEMO_USERS[email];
+  const err = document.getElementById('l-err');
+  if (!u || u.pass !== pass) {
+    err.style.display='block'; err.textContent='Email atau password salah';
+    return;
+  }
+  err.style.display='none';
+  CUR = { email, nama: u.nama, role: u.role };
+  startApp();
+}
+
+function quickLogin(email, pass) {
+  document.getElementById('l-email').value = email;
+  document.getElementById('l-pass').value = pass;
+  doLogin();
+}
+
+function doLogout() {
+  CUR = null;
+  document.getElementById('app').classList.remove('on');
+  document.getElementById('login-wrap').style.display = 'flex';
+  closePanel(); closeMo();
+  toast('Berhasil logout', 'ok');
+}
+
+function startApp() {
+  document.getElementById('login-wrap').style.display = 'none';
+  document.getElementById('app').classList.add('on');
+  setupUI();
+  renderAll();
+}
+
+// ══════════════════════════════════════════════════
+// UI SETUP
+// ══════════════════════════════════════════════════
+function setupUI() {
+  const r = CUR.role;
+  const isAdmin = ['admin','superadmin'].includes(r);
+  const isSA = r === 'superadmin';
+  document.getElementById('sb-nama').textContent = CUR.nama;
+  document.getElementById('sb-ava').textContent = CUR.nama[0].toUpperCase();
+  const rb = document.getElementById('sb-rbadge');
+  rb.textContent = r;
+  rb.className = `pill ${isSA?'p-rd':isAdmin?'p-am':'p-bl'}`;
+  document.getElementById('sb-admin').style.display = isSA ? 'block' : 'none';
+  // hide edit buttons for viewer
+  if (!isAdmin) {
+    ['btn-add-k','btn-add-ss','btn-export'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
+  }
+}
+
+// ══════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════
+const META = {
+  dashboard: ['Dashboard','Ringkasan operasional · BPG Pertamina'],
+  armada:    ['Armada BPG','51 kapal · Fleet I–V · PIS & PHM'],
+  klaim:     ['Semua Klaim','Data klaim Pertamina aktif'],
+  slowspeed: ['Slow Speed / SSOB','List voyage slow speed'],
+  progress:  ['Progress Sanggah','Update per klaim ke Pertamina'],
+  timeline:  ['Timeline Klaim','4 fase · ~45 hari kerja'],
+  upload:    ['Import / Export','Upload Excel & download data'],
+  users:     ['Kelola User','Superadmin only'],
+};
+
+function nav(id, el) {
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.sb-link').forEach(l=>l.classList.remove('on'));
+  document.getElementById('pg-'+id)?.classList.add('on');
+  el?.classList?.add('on');
+  document.getElementById('top-title').textContent = META[id]?.[0]||id;
+  document.getElementById('top-sub').textContent   = META[id]?.[1]||'';
+  if (id==='users') renderUsers();
+  if (id==='timeline') buildTL();
+}
+
+function gSearch(q) {
+  if (!q) return;
+  nav('klaim', qs('[onclick*="klaim"]'));
+  document.getElementById('kl-q').value = q;
+  renderKlaim();
+}
+
+const qs = s => document.querySelector(s);
+const isAdmin = () => ['admin','superadmin'].includes(CUR?.role);
+
+// ══════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════
+const fIdr = v => v ? 'Rp '+Math.round(v).toLocaleString('id-ID') : '—';
+const fUsd = v => v ? '$'+v.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+const SP = {CLAIMABLE:'p-gn','ON PROSES':'p-am',UNCLAIM:'p-gr','OWNER BENEFIT':'p-pu','ON PROSES KOREKSI':'p-bl','CLAIMABLE KOREKSI':'p-bl'};
+const JP = {'OFF HIRE':'p-bl','BUNKER OFF HIRE':'p-bl','SLOW SPEED':'p-rd','OVER BUNKER SLOW SPEED':'p-rd','TRANSPORT LOSS':'p-am','SLOW PUMPING':'p-am','SSOB':'p-rd','OVER BUNKER':'p-rd','BUNKER OFFSET DELIVERY/REDELIVERY':'p-pu'};
+
+function toast(msg,type='ok') {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='on '+type;
+  clearTimeout(el._t); el._t=setTimeout(()=>el.className='',2800);
+}
+function closeMo(){ document.getElementById('mo-overlay').classList.remove('on') }
+function closePanel(){ document.getElementById('panel').classList.remove('on'); panCtx=null; }
+let panCtx=null;
+
+// ══════════════════════════════════════════════════
+// RENDER ALL
+// ══════════════════════════════════════════════════
+function renderAll() {
+  updateDash();
+  renderKlaim();
+  renderSS();
+  renderProgress();
+  renderArmada();
+}
+
+// ══════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════
+let cS,cJ;
+function updateDash() {
+  const tot = KLAIM.length;
+  const op  = KLAIM.filter(k=>k.status==='ON PROSES').length;
+  const cl  = KLAIM.filter(k=>k.status==='CLAIMABLE').length;
+  const un  = KLAIM.filter(k=>k.status==='UNCLAIM').length;
+  const usd = KLAIM.reduce((s,k)=>s+(k.usd||0),0);
+  const idr = KLAIM.reduce((s,k)=>s+(k.total_idr||0),0);
+  document.getElementById('kv-total').textContent=tot;
+  document.getElementById('kd-total').textContent=`${cl} Claimable · ${op} On Proses`;
+  document.getElementById('kv-ss').textContent=SS.length;
+  document.getElementById('kd-ss').textContent=SS.filter(s=>s.status==='CLAIMABLE').length+' Claimable';
+  document.getElementById('kv-usd').textContent='$'+Math.round(usd/1000)+'K';
+  document.getElementById('kd-usd').textContent=fIdr(idr);
+  document.getElementById('kv-done').textContent=cl;
+  document.getElementById('kd-done').textContent=Math.round(cl/Math.max(tot,1)*100)+'% dari total';
+  document.getElementById('bdg').textContent=op;
+  if(op>0){ const a=document.getElementById('dash-alert'); a.style.display='flex'; a.innerHTML=`⚠ <strong>${op} klaim "ON PROSES"</strong> perlu ditindaklanjuti`; }
+  // recent table
+  document.getElementById('dash-body').innerHTML=KLAIM.slice(0,6).map(k=>`
+    <tr class="dr" onclick="openPanel('klaim',${k.id})">
+      <td style="font-weight:500">${k.kapal.substring(0,22)}${k.kapal.length>22?'...':''}</td>
+      <td><span class="pill ${JP[k.jenis]||'p-gr'}" style="font-size:9px">${k.jenis||'—'}</span></td>
+      <td><span class="pill ${SP[k.status]||'p-gr'}">${k.status||'—'}</span></td>
+      <td style="font-weight:500">${fIdr(k.total_idr)}</td>
+      <td style="color:var(--am);font-size:11px">${k.due_date||'—'}</td>
+    </tr>`).join('');
+  buildCharts();
+}
+
+function buildCharts() {
+  const sc={},jc={};
+  KLAIM.forEach(k=>{ sc[k.status]=(sc[k.status]||0)+1; jc[k.jenis]=(jc[k.jenis]||0)+1; });
+  const dOpt={ responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}} };
+  if(cS) cS.destroy();
+  cS=new Chart(document.getElementById('cS'),{ type:'bar', data:{ labels:Object.keys(sc), datasets:[{ data:Object.values(sc), backgroundColor:['#3fb950','#d29922','#6e7681','#a371f7','#388bfd'], borderRadius:4 }] }, options:{ ...dOpt, scales:{ x:{grid:{display:false},ticks:{color:'#6e7681',font:{size:10}},border:{display:false}}, y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#6e7681',font:{size:10}},border:{display:false}} } } });
+  if(cJ) cJ.destroy();
+  cJ=new Chart(document.getElementById('cJ'),{ type:'doughnut', data:{ labels:Object.keys(jc), datasets:[{ data:Object.values(jc), backgroundColor:['#388bfd','#8b5cf6','#f59e0b','#10b981','#ef4444','#d29922','#6b7280','#a371f7'], borderWidth:0, hoverOffset:4 }] }, options:{ ...dOpt,cutout:'58%' } });
+}
+
+// ══════════════════════════════════════════════════
+// ARMADA
+// ══════════════════════════════════════════════════
+function renderArmada() {
+  const f=document.getElementById('arm-f').value;
+  const q=document.getElementById('arm-q').value.toLowerCase();
+  const FC={'FLEET I':'p-bl','FLEET II':'p-gn','FLEET III':'p-am','FLEET IV':'p-pu','FLEET V':'p-rd'};
+  const filt=ARMADA.filter(a=>(!f||a.fleet===f)&&(!q||a.nama.toLowerCase().includes(q)));
+  document.getElementById('arm-body').innerHTML=filt.map(a=>{
+    const n=KLAIM.filter(k=>k.kapal.includes(a.nama.split('/')[0].trim())).length;
+    return `<tr class="dr"><td style="color:var(--tx3)">${a.no}</td><td style="font-weight:500">${a.nama}</td><td><span class="pill ${FC[a.fleet]||'p-gr'}">${a.fleet}</span></td><td><span class="pill p-bl">${a.kontrak}</span></td><td style="color:var(--tx2)">${a.jenis}</td><td>${n>0?`<button class="btn sm" onclick="filterK('${a.nama.split('/')[0].trim()}')">${n} klaim</button>`:'<span style="color:var(--tx3)">—</span>'}</td></tr>`;
+  }).join('');
+}
+
+function filterK(nama) {
+  nav('klaim',qs('[onclick*="klaim"]'));
+  document.getElementById('kl-q').value=nama;
+  renderKlaim();
+}
+
+// ══════════════════════════════════════════════════
+// KLAIM
+// ══════════════════════════════════════════════════
+function renderKlaim() {
+  const s=document.getElementById('kl-s').value;
+  const j=document.getElementById('kl-j').value;
+  const q=document.getElementById('kl-q').value.toLowerCase();
+  const f=KLAIM.filter(k=>(!s||k.status===s)&&(!j||k.jenis===j)&&(!q||(k.kapal||'').toLowerCase().includes(q)||(k.nomor_surat||'').toLowerCase().includes(q)));
+  document.getElementById('kl-body').innerHTML=f.map(k=>`
+    <tr class="dr" onclick="openPanel('klaim',${k.id})">
+      <td style="font-weight:500;max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${k.kapal}">${k.kapal.substring(0,20)}${k.kapal.length>20?'...':''}</td>
+      <td><span class="pill ${JP[k.jenis]||'p-gr'}" style="font-size:9px">${k.jenis||'—'}</span></td>
+      <td><span class="pill ${SP[k.status]||'p-gr'}">${k.status||'—'}</span></td>
+      <td style="font-size:11px;color:var(--tx2)">${k.nomor_surat||'—'}</td>
+      <td style="color:var(--am)">${fUsd(k.usd)}</td>
+      <td style="font-weight:500">${fIdr(k.total_idr)}</td>
+      <td style="font-size:11px;color:${k.due_date&&k.due_date!=='—'?'var(--am)':'var(--tx3)'}">${k.due_date||'—'}</td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn sm" onclick="event.stopPropagation();openPanel('klaim',${k.id})">📋</button>
+        ${isAdmin()?`<button class="btn sm rd" onclick="event.stopPropagation();delKlaim(${k.id})">🗑</button>`:''}
+      </div></td>
+    </tr>`).join('');
+  document.getElementById('kl-foot').textContent=`Menampilkan ${f.length} dari ${KLAIM.length} klaim`;
+}
+
+function delKlaim(id) {
+  if(!isAdmin()) return toast('Tidak punya akses','err');
+  if(!confirm('Hapus klaim ini?')) return;
+  KLAIM=KLAIM.filter(k=>k.id!==id);
+  renderKlaim(); updateDash(); closePanel();
+  toast('🗑 Klaim dihapus');
+}
+
+function openAddKlaim(item=null) {
+  if(!isAdmin()) return toast('Tidak punya akses','err');
+  const e=!!item;
+  document.getElementById('mo-t').textContent=e?'Edit Klaim':'Tambah Klaim Baru';
+  document.getElementById('mo-b').innerHTML=`
+    <div class="frow frow-2">
+      <div class="fg"><div class="fl">Kapal *</div><input id="mc-kapal" value="${item?.kapal||''}" placeholder="Nama kapal"></div>
+      <div class="fg"><div class="fl">Jenis</div><select id="mc-jenis">${['SLOW SPEED','OVER BUNKER SLOW SPEED','OFF HIRE','BUNKER OFF HIRE','TRANSPORT LOSS','SLOW PUMPING','OVER BUNKER SLOW PUMPING','SUPPLY LOSS'].map(j=>`<option ${(item?.jenis||'')==j?'selected':''}>${j}</option>`).join('')}</select></div>
+    </div>
+    <div class="frow frow-2">
+      <div class="fg"><div class="fl">Status</div><select id="mc-stat">${['CLAIMABLE','ON PROSES','UNCLAIM','OWNER BENEFIT'].map(s=>`<option ${(item?.status||'CLAIMABLE')==s?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="fg"><div class="fl">No Surat</div><input id="mc-surat" value="${item?.nomor_surat||''}"></div>
+    </div>
+    <div class="frow frow-3">
+      <div class="fg"><div class="fl">Tahun</div><input id="mc-thn" value="${item?.tahun||''}" type="number"></div>
+      <div class="fg"><div class="fl">USD</div><input id="mc-usd" value="${item?.usd||''}" type="number" step="0.01"></div>
+      <div class="fg"><div class="fl">Total IDR</div><input id="mc-tot" value="${item?.total_idr||''}" type="number"></div>
+    </div>
+    <div class="frow frow-2">
+      <div class="fg"><div class="fl">Email Masuk</div><input id="mc-email" value="${item?.email_masuk||''}" type="date"></div>
+      <div class="fg"><div class="fl">Due Date</div><input id="mc-due" value="${item?.due_date||''}" type="date"></div>
+    </div>
+    <div class="fg"><div class="fl">Progress Sanggahan</div><textarea id="mc-prog">${item?.progress||''}</textarea></div>
+    <div class="fg"><div class="fl">Catatan</div><textarea id="mc-cat" rows="2">${item?.catatan||''}</textarea></div>`;
+  document.getElementById('mo-f').innerHTML=`<button class="btn" onclick="closeMo()">Batal</button><button class="btn pr" onclick="saveKlaim(${e?item.id:'null'})">💾 ${e?'Update':'Simpan'}</button>`;
+  document.getElementById('mo-overlay').classList.add('on');
+}
+
+function saveKlaim(id) {
+  if(!isAdmin()) return;
+  const p={id:id||Date.now(),kapal:document.getElementById('mc-kapal').value.trim(),jenis:document.getElementById('mc-jenis').value,status:document.getElementById('mc-stat').value,nomor_surat:document.getElementById('mc-surat').value,tahun:parseInt(document.getElementById('mc-thn').value)||null,usd:parseFloat(document.getElementById('mc-usd').value)||null,total_idr:parseFloat(document.getElementById('mc-tot').value)||null,email_masuk:document.getElementById('mc-email').value||null,due_date:document.getElementById('mc-due').value||null,progress:document.getElementById('mc-prog').value,catatan:document.getElementById('mc-cat').value};
+  if(!p.kapal){ toast('Nama kapal wajib diisi','err'); return; }
+  if(id){ KLAIM=KLAIM.map(k=>k.id==id?p:k); toast('✅ Klaim diupdate'); }
+  else { KLAIM.unshift(p); toast('✅ Klaim ditambahkan'); }
+  renderKlaim(); updateDash(); closeMo(); closePanel();
+}
+
+// ══════════════════════════════════════════════════
+// SLOW SPEED
+// ══════════════════════════════════════════════════
+function renderSS() {
+  const sc={CLAIMABLE:'p-gn','ON PROSES':'p-am',UNCLAIM:'p-gr',KOREKSI:'p-bl'};
+  const f=SS.filter(s=>{ const sf=document.getElementById('ss-f')?.value; const q=document.getElementById('ss-q')?.value?.toLowerCase(); return (!sf||s.status===sf)&&(!q||(s.kapal||'').toLowerCase().includes(q)||(s.voyage||'').toLowerCase().includes(q)); });
+  document.getElementById('ss-total').textContent=SS.length;
+  document.getElementById('ss-unclaim').textContent=SS.filter(s=>s.status==='UNCLAIM').length;
+  document.getElementById('ss-proses').textContent=SS.filter(s=>s.status==='ON PROSES').length;
+  document.getElementById('ss-claim').textContent=SS.filter(s=>s.status==='CLAIMABLE').length;
+  document.getElementById('ss-body').innerHTML=f.map((s,i)=>`
+    <tr class="dr" onclick="openPanel('ss',${s.id})">
+      <td style="color:var(--tx3)">${i+1}</td>
+      <td style="font-weight:500;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.kapal}">${s.kapal.substring(0,17)}${s.kapal.length>17?'...':''}</td>
+      <td style="font-size:11px;color:var(--tx2)">${s.voyage||'—'}</td>
+      <td><span class="pill ${sc[s.status]||'p-gr'}">${s.status||'—'}</span></td>
+      <td style="color:var(--tx2)">${s.dari||'—'}</td>
+      <td style="color:var(--tx2)">${s.tiba||'—'}</td>
+      <td><span class="pill p-rd" style="font-size:9px">${s.jenis||'—'}</span></td>
+      <td style="font-weight:500">${s.usd?fUsd(s.usd):fIdr(s.idr)}</td>
+      <td><button class="btn sm" onclick="event.stopPropagation();openPanel('ss',${s.id})">📋</button></td>
+    </tr>`).join('');
+  document.getElementById('ss-foot').textContent=`Menampilkan ${f.length} dari ${SS.length} voyage`;
+}
+
+function openAddSS() {
+  document.getElementById('mo-t').textContent='Tambah Voyage Slow Speed';
+  document.getElementById('mo-b').innerHTML=`
+    <div class="frow frow-2">
+      <div class="fg"><div class="fl">Kapal *</div><input id="as-k" placeholder="Nama kapal"></div>
+      <div class="fg"><div class="fl">Voyage</div><input id="as-v" placeholder="001/D/KS/I/2024"></div>
+    </div>
+    <div class="frow frow-2">
+      <div class="fg"><div class="fl">Status</div><select id="as-s"><option>UNCLAIM</option><option>CLAIMABLE</option><option>ON PROSES</option><option>KOREKSI</option></select></div>
+      <div class="fg"><div class="fl">Jenis</div><select id="as-j"><option>SLOW SPEED</option><option>OVER BUNKER</option><option>SSOB</option></select></div>
+    </div>
+    <div class="frow frow-2">
+      <div class="fg"><div class="fl">Dari</div><input id="as-d" placeholder="Pelabuhan asal"></div>
+      <div class="fg"><div class="fl">Tiba</div><input id="as-t" placeholder="Pelabuhan tujuan"></div>
+    </div>
+    <div class="frow frow-2">
+      <div class="fg"><div class="fl">Nilai USD</div><input id="as-u" type="number" step="0.01"></div>
+      <div class="fg"><div class="fl">Nilai IDR</div><input id="as-i" type="number"></div>
+    </div>
+    <div class="fg"><div class="fl">Catatan</div><textarea id="as-c" rows="2"></textarea></div>`;
+  document.getElementById('mo-f').innerHTML=`<button class="btn" onclick="closeMo()">Batal</button><button class="btn pr" onclick="saveSS()">💾 Simpan</button>`;
+  document.getElementById('mo-overlay').classList.add('on');
+}
+
+function saveSS() {
+  const p={id:Date.now(),kapal:document.getElementById('as-k').value.trim(),voyage:document.getElementById('as-v').value.trim(),status:document.getElementById('as-s').value,jenis:document.getElementById('as-j').value,dari:document.getElementById('as-d').value.trim(),tiba:document.getElementById('as-t').value.trim(),usd:parseFloat(document.getElementById('as-u').value)||null,idr:parseFloat(document.getElementById('as-i').value)||null,total:parseFloat(document.getElementById('as-u').value)||parseFloat(document.getElementById('as-i').value)||null,catatan:document.getElementById('as-c').value};
+  if(!p.kapal){ toast('Nama kapal wajib','err'); return; }
+  SS.unshift(p); renderSS(); closeMo();
+  toast('✅ Voyage ditambahkan');
+}
+
+// ══════════════════════════════════════════════════
+// PROGRESS
+// ══════════════════════════════════════════════════
+function renderProgress() {
+  const prog=KLAIM.filter(k=>k.progress);
+  document.getElementById('prog-body').innerHTML=prog.map((p,i)=>`
+    <tr class="dr" onclick="openPanel('klaim',${p.id})">
+      <td style="color:var(--tx3)">${i+1}</td>
+      <td style="font-weight:500;color:var(--bl)">${p.kapal.substring(0,20)}${p.kapal.length>20?'...':''}</td>
+      <td style="font-size:11px;color:var(--tx2)">${(p.jenis||'').substring(0,35)}</td>
+      <td style="font-size:11px">${(p.progress||'').substring(0,80)}${(p.progress||'').length>80?'...':''}</td>
+      <td style="color:var(--am)">${fUsd(p.usd)}</td>
+      <td style="color:var(--bl)">${fIdr(p.total_idr)}</td>
+      <td><button class="btn sm" onclick="event.stopPropagation();openPanel('klaim',${p.id})">✏</button></td>
+    </tr>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+// SIDE PANEL
+// ══════════════════════════════════════════════════
+function openPanel(type,id) {
+  panCtx={type,id};
+  const can=isAdmin();
+  const inp=(f,v,tp='text')=>can?`<input id="p-${f}" value="${v||''}" type="${tp}" style="margin-top:4px;width:100%">`:`<div style="font-size:13px;margin-top:4px;padding:6px 8px;background:var(--bg3);border-radius:6px;color:var(--tx2)">${v||'—'}</div>`;
+  const sel=(f,opts,v)=>can?`<select id="p-${f}" style="margin-top:4px;width:100%">${opts.map(o=>`<option ${v===o?'selected':''}>${o}</option>`).join('')}</select>`:`<div style="font-size:13px;margin-top:4px;padding:6px 8px;background:var(--bg3);border-radius:6px;color:var(--tx2)">${v||'—'}</div>`;
+  const txta=(f,v)=>can?`<textarea id="p-${f}" rows="3" style="margin-top:4px;width:100%">${v||''}</textarea>`:`<div style="font-size:12px;margin-top:4px;padding:8px;background:var(--bg3);border-radius:6px;color:var(--tx2);line-height:1.5">${v||'—'}</div>`;
+
+  if(type==='klaim') {
+    const k=KLAIM.find(x=>x.id===id); if(!k) return;
+    document.getElementById('pan-t').textContent=k.kapal.substring(0,28);
+    document.getElementById('pan-b').innerHTML=`
+      <div class="fg"><div class="fl">Kapal</div>${inp('kapal',k.kapal)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg"><div class="fl">Status</div>${sel('status',['CLAIMABLE','ON PROSES','UNCLAIM','OWNER BENEFIT','ON PROSES KOREKSI'],k.status)}</div>
+        <div class="fg"><div class="fl">Jenis</div>${inp('jenis',k.jenis)}</div>
+      </div>
+      <div class="fg"><div class="fl">No Surat</div>${inp('surat',k.nomor_surat)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg"><div class="fl">USD</div>${inp('usd',k.usd,'number')}</div>
+        <div class="fg"><div class="fl">Total IDR</div>${inp('total',k.total_idr,'number')}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg"><div class="fl">Email Masuk</div>${inp('email',k.email_masuk,'date')}</div>
+        <div class="fg"><div class="fl">Due Date</div>${inp('due',k.due_date,'date')}</div>
+      </div>
+      <div style="height:1px;background:var(--bdr);margin:12px 0"></div>
+      <div class="fg"><div class="fl">Progress Sanggahan</div>${txta('progress',k.progress)}</div>
+      <div class="fg"><div class="fl">Catatan Internal</div>${txta('catatan',k.catatan)}</div>`;
+    document.getElementById('pan-f').innerHTML=can
+      ?`<button class="btn gn" onclick="savePanel()" style="flex:1">💾 Simpan</button><button class="btn sm" onclick="openAddKlaim(KLAIM.find(x=>x.id==${id}))">✏ Edit Lengkap</button><button class="btn sm rd" onclick="delKlaim(${id})">🗑</button>`
+      :`<div style="font-size:11px;color:var(--tx3)">Mode viewer — tidak bisa mengedit</div>`;
+
+  } else if(type==='ss') {
+    const s=SS.find(x=>x.id===id); if(!s) return;
+    document.getElementById('pan-t').textContent=s.voyage||'Voyage';
+    document.getElementById('pan-b').innerHTML=`
+      <div class="fg"><div class="fl">Kapal</div>${inp('kapal',s.kapal)}</div>
+      <div class="fg"><div class="fl">Voyage</div>${inp('voyage',s.voyage)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg"><div class="fl">Status</div>${sel('status',['CLAIMABLE','ON PROSES','UNCLAIM','KOREKSI'],s.status)}</div>
+        <div class="fg"><div class="fl">Jenis</div>${inp('jenis',s.jenis)}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg"><div class="fl">Dari</div>${inp('dari',s.dari)}</div>
+        <div class="fg"><div class="fl">Tiba</div>${inp('tiba',s.tiba)}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg"><div class="fl">USD</div>${inp('usd',s.usd,'number')}</div>
+        <div class="fg"><div class="fl">IDR</div>${inp('idr',s.idr,'number')}</div>
+      </div>
+      <div class="fg"><div class="fl">Catatan</div>${txta('catatan',s.catatan)}</div>`;
+    document.getElementById('pan-f').innerHTML=can
+      ?`<button class="btn gn" onclick="savePanel()" style="flex:1">💾 Simpan</button>`
+      :`<div style="font-size:11px;color:var(--tx3)">Mode viewer</div>`;
+  }
+  document.getElementById('panel').classList.add('on');
+}
+
+function savePanel() {
+  if(!isAdmin()||!panCtx) return;
+  const {type,id}=panCtx;
+  if(type==='klaim') {
+    const k=KLAIM.find(x=>x.id===id); if(!k) return;
+    k.kapal       = document.getElementById('p-kapal')?.value||k.kapal;
+    k.status      = document.getElementById('p-status')?.value||k.status;
+    k.jenis       = document.getElementById('p-jenis')?.value||k.jenis;
+    k.nomor_surat = document.getElementById('p-surat')?.value||k.nomor_surat;
+    k.usd         = parseFloat(document.getElementById('p-usd')?.value)||null;
+    k.total_idr   = parseFloat(document.getElementById('p-total')?.value)||null;
+    k.email_masuk = document.getElementById('p-email')?.value||null;
+    k.due_date    = document.getElementById('p-due')?.value||null;
+    k.progress    = document.getElementById('p-progress')?.value||'';
+    k.catatan     = document.getElementById('p-catatan')?.value||'';
+    renderKlaim(); updateDash(); renderProgress();
+  } else if(type==='ss') {
+    const s=SS.find(x=>x.id===id); if(!s) return;
+    s.kapal  = document.getElementById('p-kapal')?.value||s.kapal;
+    s.voyage = document.getElementById('p-voyage')?.value||s.voyage;
+    s.status = document.getElementById('p-status')?.value||s.status;
+    s.jenis  = document.getElementById('p-jenis')?.value||s.jenis;
+    s.dari   = document.getElementById('p-dari')?.value||s.dari;
+    s.tiba   = document.getElementById('p-tiba')?.value||s.tiba;
+    s.usd    = parseFloat(document.getElementById('p-usd')?.value)||null;
+    s.idr    = parseFloat(document.getElementById('p-idr')?.value)||null;
+    s.catatan= document.getElementById('p-catatan')?.value||'';
+    renderSS();
+  }
+  toast('✅ Tersimpan'); closePanel();
+}
+
+// ══════════════════════════════════════════════════
+// USERS
+// ══════════════════════════════════════════════════
+function renderUsers() {
+  if(CUR?.role!=='superadmin') { toast('Akses ditolak','err'); return; }
+  const rc={superadmin:'p-rd',admin:'p-am',viewer:'p-bl'};
+  document.getElementById('u-body').innerHTML=USERS_DATA.map(u=>`
+    <tr class="dr">
+      <td style="font-weight:500">${u.nama}</td>
+      <td style="color:var(--tx2)">${u.email}</td>
+      <td><span class="pill ${rc[u.role]||'p-gr'}">${u.role}</span></td>
+      <td><div style="display:flex;gap:6px;align-items:center">
+        <select onchange="setRole('${u.id}',this.value)" style="width:auto;padding:3px 6px;font-size:11px">
+          ${['viewer','admin','superadmin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}
+        </select>
+        ${u.id!=='u1'?`<button class="btn sm rd" onclick="delUser('${u.id}')">🗑</button>`:''}
+      </div></td>
+    </tr>`).join('');
+}
+
+function setRole(id,role) {
+  USERS_DATA=USERS_DATA.map(u=>u.id===id?{...u,role}:u);
+  toast(`✅ Role diupdate ke ${role}`);
+  renderUsers();
+}
+
+function delUser(id) {
+  if(!confirm('Hapus user ini?')) return;
+  USERS_DATA=USERS_DATA.filter(u=>u.id!==id);
+  renderUsers(); toast('🗑 User dihapus');
+}
+
+function openAddUser() {
+  document.getElementById('mo-t').textContent='Tambah User Baru';
+  document.getElementById('mo-b').innerHTML=`
+    <div class="fg"><div class="fl">Nama *</div><input id="nu-nama" placeholder="Nama lengkap"></div>
+    <div class="fg"><div class="fl">Email *</div><input id="nu-email" type="email" placeholder="nama@domain.com"></div>
+    <div class="fg"><div class="fl">Password</div><input id="nu-pass" type="password" placeholder="Minimal 6 karakter" value="demo123"></div>
+    <div class="fg"><div class="fl">Role</div><select id="nu-role"><option value="viewer">Viewer</option><option value="admin">Admin</option><option value="superadmin">Superadmin</option></select></div>`;
+  document.getElementById('mo-f').innerHTML=`<button class="btn" onclick="closeMo()">Batal</button><button class="btn pr" onclick="saveUser()">💾 Tambah User</button>`;
+  document.getElementById('mo-overlay').classList.add('on');
+}
+
+function saveUser() {
+  const nama=document.getElementById('nu-nama').value.trim();
+  const email=document.getElementById('nu-email').value.trim().toLowerCase();
+  const pass=document.getElementById('nu-pass').value;
+  const role=document.getElementById('nu-role').value;
+  if(!nama||!email) { toast('Nama & email wajib diisi','err'); return; }
+  DEMO_USERS[email]={pass,nama,role};
+  USERS_DATA.push({id:'u'+Date.now(),nama,email,role});
+  renderUsers(); closeMo();
+  toast(`✅ User ${nama} ditambahkan sebagai ${role}`);
+}
+
+// ══════════════════════════════════════════════════
+// TIMELINE
+// ══════════════════════════════════════════════════
+const TL_PH=[
+  {id:1,name:'Registrasi',days:'H1–H5',actor:'Admin',c:'#3b82f6',bg:'rgba(59,130,246,.14)',bd:'rgba(59,130,246,.3)',
+   steps:['Terima surat klaim (PDF)','Catat nomor & tanggal surat','Identifikasi jenis klaim','Buat folder kerja','Forward ke tim teknis'],
+   docs:['Surat klaim PDF','Log penerimaan','ID Klaim internal'],
+   note:'⚠ Catat equivalensi nama pelabuhan (Pekanbaru = Sei Siak).',
+   checks:['Nomor surat tercatat','Jenis klaim teridentifikasi','Folder dibuat','Tim teknis diinformasikan']},
+  {id:2,name:'Analisis',days:'H5–H20',actor:'Tim Teknis',c:'#8b5cf6',bg:'rgba(139,92,246,.14)',bd:'rgba(139,92,246,.3)',
+   steps:['Tarik data voyage KAL','Kumpulkan ROB awal/akhir','Verifikasi ATD & ATA log book','Input data PTM (merah) & KAL (hijau)','Hitung selisih kecepatan & bunker','Konversi IDR — kurs BI','Validasi supervisor'],
+   docs:['KAL Voyage Excel','Log Book / BRH','ROB record','Bunker receipt','Kalkulasi Slow Speed','Kurs BI'],
+   note:'📊 Template: 9 baris per klaim · Arial 9pt · Notes CAPS · Multi-leg = baris terpisah.',
+   checks:['Data KAL ditarik','ROB & ATD terverifikasi','Workbook terisi','Supervisor validasi']},
+  {id:3,name:'Respons & Sanggah',days:'H20–H35',actor:'Legal / Manager',c:'#f59e0b',bg:'rgba(245,158,11,.14)',bd:'rgba(245,158,11,.3)',
+   steps:['Susun argumen keberatan','Lampirkan kalkulasi final','Sertakan bukti & BMKG','Review bahasa charter party','Kirim surat keberatan','Simpan bukti pengiriman'],
+   docs:['Surat keberatan final','Kalkulasi (Excel)','Data BMKG','Bukti pengiriman'],
+   note:'📝 Perpanjangan BMKG → ajukan SEBELUM due date. Biasanya disetujui +10 hari.',
+   checks:['Argumen kuat','Kalkulasi & BMKG terlampir','Surat terkirim','Bukti kirim tersimpan']},
+  {id:4,name:'Closure & Arsip',days:'H35–H45+',actor:'Semua pihak',c:'#10b981',bg:'rgba(16,185,129,.14)',bd:'rgba(16,185,129,.3)',
+   steps:['Pantau balasan Pertamina','Update Merged SlowSpeed workbook','Catat hasil akhir','Arsipkan ke folder 05_Arsip','Merge workbook setelah resmi tutup'],
+   docs:['Balasan Pertamina','Merged SlowSpeed workbook','Dokumen kesepakatan','Arsip klaim'],
+   note:'✅ Merge HANYA setelah klaim resmi tutup. Urut kronologis per ATD.',
+   checks:['Balasan PTM diterima','Status final dicatat','Workbook di-merge','Dokumen diarsip']},
+];
+const TL_LANES=[
+  {l:'ADMIN',c:'#3b82f6',segs:[{s:0,e:11,l:'Terima & registrasi',c:'#3b82f6'},{s:38,e:45,l:'Arsip',c:'#10b981',op:.6}]},
+  {l:'TEKNIS',c:'#8b5cf6',segs:[{s:9,e:27,l:'Rekonsiliasi',c:'#8b5cf6'},{s:25,e:31,l:'Validasi',c:'#7c3aed',op:.65}]},
+  {l:'LEGAL',c:'#f59e0b',segs:[{s:22,e:38,l:'Surat keberatan',c:'#f59e0b'},{s:36,e:45,l:'Negosiasi',c:'#d97706',op:.65}]},
+  {l:'BMKG',c:'#6b7280',segs:[{s:13,e:25,l:'Data cuaca',c:'#6b7280',op:.5}]},
+];
+const TL_EX={selesai:{day:45,c:'#10b981',l:'✅ SELESAI',pg:[100,100,100,100]},proses:{day:18,c:'#f59e0b',l:'⏳ H-18',pg:[100,65,0,0]},overdue:{day:52,c:'#ef4444',l:'🚨 OVERDUE',pg:[100,100,95,15]},awal:{day:2,c:'#3b82f6',l:'🆕 H-2',pg:[5,0,0,0]}};
+let tlCurEx='selesai', tlActive=1;
+const tlp=d=>Math.min(d/45*100,100).toFixed(2);
+
+function buildTL() {
+  const ex=TL_EX[tlCurEx];
+  // phase header
+  document.getElementById('tl-ph').innerHTML=TL_PH.map(p=>`<div class="tl-ph" style="background:${p.bg};border:1px solid ${p.bd};border-bottom:none" onclick="tlClick(${p.id})"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${p.c};opacity:.65;margin-bottom:3px">Fase ${p.id}</div><div style="font-size:12px;font-weight:700;color:${p.c};margin-bottom:2px">${p.name}</div><div style="font-size:10px;color:${p.c};opacity:.7">${p.days} · ${p.actor}</div></div>`).join('');
+  // ruler
+  document.getElementById('tl-ruler').innerHTML=[1,5,10,15,20,25,30,35,40,45].map(d=>`<div style="position:absolute;left:${tlp(d)}%;font-size:9px;color:#8b949e;font-weight:600;transform:translateX(-50%)">H${d}</div>`).join('');
+  // lanes
+  const dls=[{day:10,l:'⚠DUE',c:'#ef4444'},{day:25,l:'BMKG',c:'#f59e0b'},{day:35,l:'KIRIM',c:'#8b5cf6'}];
+  document.getElementById('tl-lanes').innerHTML=TL_LANES.map(lane=>`
+    <div style="display:flex;align-items:center;min-height:26px;border-top:1px solid rgba(255,255,255,.07);padding:3px 0">
+      <div style="width:76px;flex-shrink:0;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${lane.c}">${lane.l}</div>
+      <div style="flex:1;position:relative;height:22px">
+        ${lane.segs.map(seg=>`<div class="tl-seg" style="left:${tlp(seg.s)}%;width:calc(${tlp(seg.e-seg.s)}% - 2px);background:${seg.c};opacity:${seg.op||1}" title="${seg.l}">${seg.l}</div>`).join('')}
+        ${dls.map(dl=>`<div class="tl-dl" style="left:${tlp(dl.day)}%;background:${dl.c}" data-l="${dl.l}"></div>`).join('')}
+        <div class="tl-pos" style="left:${tlp(Math.min(ex.day,45))}%;background:${ex.c};color:${ex.c}" data-l="${ex.l}"></div>
+      </div>
+    </div>`).join('');
+  // milestone cards
+  document.getElementById('tl-ms').innerHTML=TL_PH.map(p=>`
+    <div id="tlm-${p.id}" onclick="tlClick(${p.id})" style="border-radius:8px;padding:11px 12px 10px;background:${p.bg};border:1px solid ${tlActive===p.id?'rgba(255,255,255,.22)':p.bd};cursor:pointer;position:relative;overflow:hidden;transition:transform .15s;transform:${tlActive===p.id?'translateY(-2px)':''}" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='${tlActive===p.id?'translateY(-2px)':''}'">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${p.c};border-radius:8px 8px 0 0"></div>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${p.c};opacity:.65;margin-bottom:4px">Fase ${p.id}</div>
+      <div style="font-size:12px;font-weight:700;color:${p.c};margin-bottom:2px">${p.name}</div>
+      <div style="font-size:10px;color:${p.c};opacity:.7;margin-bottom:7px">${p.days}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px">${p.docs.slice(0,3).map(d=>`<span style="font-size:9px;background:rgba(0,0,0,.18);border-radius:3px;padding:2px 5px">${d}</span>`).join('')}${p.docs.length>3?`<span style="font-size:9px;background:rgba(0,0,0,.18);border-radius:3px;padding:2px 5px">+${p.docs.length-3}</span>`:''}</div>
+    </div>`).join('');
+  tlShowDet(tlActive||1);
+}
+
+function tlEx(key,el) {
+  tlCurEx=key;
+  document.querySelectorAll('[id^=ex-]').forEach(e=>e.style.outline='none');
+  el.style.outline=`2px solid ${TL_EX[key].c}`;
+  buildTL();
+}
+
+function tlClick(id) {
+  if(tlActive===id) { tlActive=null; document.getElementById('tl-det').style.display='none'; buildTL(); return; }
+  tlActive=id; tlShowDet(id); buildTL();
+}
+
+function tlShowDet(id) {
+  const p=TL_PH.find(x=>x.id===id); if(!p) return;
+  const ex=TL_EX[tlCurEx]; const pct=ex.pg[id-1];
+  document.getElementById('tl-det').style.display='block';
+  document.getElementById('tl-det').innerHTML=`
+    <div style="background:var(--bg2);border:1px solid rgba(255,255,255,.13);border-radius:10px;padding:16px 18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700">
+          <span style="width:11px;height:11px;border-radius:50%;background:${p.c};display:inline-block;flex-shrink:0"></span>
+          Fase ${p.id} — ${p.name}
+          <span style="font-size:11px;font-weight:400;color:var(--tx2)">${p.days} · ${p.actor}</span>
+        </div>
+        <button onclick="tlClick(${p.id})" style="background:none;border:1px solid var(--bdr2);border-radius:6px;color:var(--tx2);cursor:pointer;font-size:11px;padding:3px 10px">✕</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;background:var(--bg3);padding:9px 12px;border-radius:7px;margin-bottom:12px">
+        <div style="font-size:10px;color:var(--tx2);width:80px">Progress <span style="color:${ex.c}">${ex.l}</span></div>
+        <div style="flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${p.c};border-radius:3px;transition:width .5s"></div></div>
+        <div style="font-size:11px;font-weight:700;color:${p.c};width:30px;text-align:right">${pct}%</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:12px">
+        <div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--tx3);margin-bottom:8px">📋 Langkah</div>
+          ${p.steps.map(s=>`<div style="font-size:11px;color:var(--tx2);display:flex;gap:5px;margin-bottom:6px;line-height:1.4"><span style="color:var(--tx3);flex-shrink:0">›</span>${s}</div>`).join('')}
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--tx3);margin-bottom:8px">📄 Dokumen</div>
+          ${p.docs.map(d=>`<div style="font-size:11px;color:var(--tx2);display:flex;gap:5px;margin-bottom:6px"><span style="color:var(--tx3);flex-shrink:0">›</span>${d}</div>`).join('')}
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--tx3);margin-bottom:8px">✅ Checklist</div>
+          ${p.checks.map(c=>`<div style="font-size:11px;color:var(--tx2);display:flex;gap:5px;margin-bottom:6px"><span style="color:${p.c};flex-shrink:0">☐</span>${c}</div>`).join('')}
+        </div>
+      </div>
+      <div style="font-size:11px;padding:10px 12px;border-radius:7px;background:var(--bg3);color:var(--tx2);line-height:1.6;border-left:3px solid ${p.c}">${p.note}</div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════
+// UPLOAD / EXPORT
+// ══════════════════════════════════════════════════
+function handleDrop(e) { e.preventDefault(); document.getElementById('drop-z').style.borderColor=''; handleFile(e.dataTransfer.files[0]); }
+function handleFile(file) {
+  if(!isAdmin()) { toast('Hanya admin yang bisa upload','err'); return; }
+  if(!file) return;
+  document.getElementById('up-st').textContent='⏳ Membaca: '+file.name;
+  const r=new FileReader();
+  r.onload=e=>{
+    try {
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      document.getElementById('up-st').innerHTML=`✅ <strong>${file.name}</strong> dimuat · ${wb.SheetNames.length} sheet: <em>${wb.SheetNames.join(', ')}</em>`;
+      toast('✅ '+file.name+' berhasil dibaca','ok');
+    } catch(err){ document.getElementById('up-st').textContent='❌ Gagal: '+err.message; }
+  };
+  r.readAsBinaryString(file);
+}
+
+function exportExcel(type) {
+  const wb=XLSX.utils.book_new();
+  if(!type||type==='klaim'||type==='all') { const ws=XLSX.utils.json_to_sheet(KLAIM.map(k=>({'Kapal':k.kapal,'Jenis':k.jenis,'Status':k.status,'No Surat':k.nomor_surat,'Tahun':k.tahun,'USD':k.usd,'Total IDR':k.total_idr,'Email Masuk':k.email_masuk,'Due Date':k.due_date,'Progress':k.progress,'Catatan':k.catatan}))); XLSX.utils.book_append_sheet(wb,ws,'Klaim'); }
+  if(!type||type==='ss'||type==='all') { const ws=XLSX.utils.json_to_sheet(SS.map(s=>({'Kapal':s.kapal,'Voyage':s.voyage,'Status':s.status,'Dari':s.dari,'Tiba':s.tiba,'Jenis':s.jenis,'USD':s.usd,'IDR':s.idr,'Total':s.total,'Catatan':s.catatan}))); XLSX.utils.book_append_sheet(wb,ws,'Slow Speed'); }
+  XLSX.writeFile(wb,`BPG_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('✅ Excel diunduh','ok');
+}
+
+function exportCSV(type) {
+  const src=type==='ss'?SS:KLAIM;
+  if(!src.length){ toast('Tidak ada data','err'); return; }
+  const keys=Object.keys(src[0]);
+  const rows=[keys.join(','),...src.map(r=>keys.map(k=>`"${r[k]||''}"`).join(','))];
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));
+  a.download=`BPG_${type}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast('✅ CSV diunduh','ok');
+}
+
+// ══════════════════════════════════════════════════
+// KEYBOARD
+// ══════════════════════════════════════════════════
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ closePanel(); closeMo(); }
+  if(e.key==='/'&&document.activeElement.tagName!=='INPUT'){ e.preventDefault(); document.getElementById('g-q').focus(); }
+});
+document.getElementById('mo-overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('mo-overlay')) closeMo(); });
+</script>
+</body>
+</html>
